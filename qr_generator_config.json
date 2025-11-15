@@ -1,0 +1,65 @@
+{
+    "assets": {
+        "input_file": "D:/vpn/nn.txt",
+        "output_dir": "qr_results",
+        "logo_file": "D:/vpn/photo_2025-11-15_22-02-56.jpg"
+    },
+    "text": {
+        "title": "VPN Configuration",
+        "subtitle": "Scan to Connect",
+        "name_prefix": "VPN",
+        "title_font_size": 24,
+        "subtitle_font_size": 18,
+        "name_font_size": 40,
+        "text_color": "#FFFFFF"
+    },
+    "generation": {
+        "qr_scale": 16,
+        "output_dpi": 600,
+        "output_quality": 98,
+        "output_format": "PNG",
+        "create_zip": false,
+        "create_pdf": false
+    },
+    "selected_template": 5,
+    "theme_colors": [
+        [
+            0,
+            119,
+            190
+        ],
+        [
+            0,
+            180,
+            216
+        ],
+        [
+            144,
+            224,
+            239
+        ]
+    ],
+    "custom_colors": [
+        [
+            0,
+            119,
+            190
+        ],
+        [
+            0,
+            180,
+            216
+        ],
+        [
+            144,
+            224,
+            239
+        ]
+    ],
+    "use_custom_colors": true,
+    "dark_theme": true,
+    "auto_theme": false,
+    "quick_preview_mode": true,
+    "preview_quality": 0.7,
+    "current_theme_preset": "Blue Ocean"
+}
