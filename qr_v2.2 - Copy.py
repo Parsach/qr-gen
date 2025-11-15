@@ -98,6 +98,7 @@ class ModernQRGenerator(QMainWindow):
         self.preview_pixmap = None
         self.preview_scale = 1.0
         self.preview_rotation = 0
+        self.last_qr_preview_size = (0, 0)
         
         # 加载数据
         self.load_config()
@@ -417,11 +418,14 @@ class ModernQRGenerator(QMainWindow):
         self.qr_scale_slider.setValue(self.qr_scale)
         self.qr_scale_slider.valueChanged.connect(lambda v: setattr(self, 'qr_scale', v) or self.update_preview())
         self.qr_scale_label = QLabel(str(self.qr_scale))
+        self.qr_dimensions_label = QLabel("QR Pixels: --")
+        self.qr_dimensions_label.setStyleSheet("color: #888; font-size: 11px;")
         
         scale_layout = QHBoxLayout()
         scale_layout.addWidget(self.qr_scale_slider)
         scale_layout.addWidget(self.qr_scale_label)
         quality_layout.addRow("QR Scale:", scale_layout)
+        quality_layout.addRow("", self.qr_dimensions_label)
         
         self.dpi_spin = QSpinBox()
         self.dpi_spin.setRange(200, 600)
@@ -1539,7 +1543,10 @@ class ModernQRGenerator(QMainWindow):
             ("🔮 Glassmorphism - Glass morphism effect", 2),
             ("⚡ Neon Cyberpunk - Cyberpunk neon style", 3),
             ("✨ Minimalist - Clean minimal design", 4),
-            ("💎 3D Luxury - 3D luxury card", 5)
+            ("💎 3D Luxury - 3D luxury card", 5),
+            ("🌈 Aurora Glow - Floating halo aesthetic", 6),
+            ("🧊 Split Contrast - Bold two-tone layout", 7),
+            ("🌅 Sunrise Spotlight - Diagonal spotlight layout", 8)
         ]
         
         for name, template_id in templates:
@@ -1561,7 +1568,10 @@ class ModernQRGenerator(QMainWindow):
             2: "Glassmorphism", 
             3: "Neon Cyberpunk",
             4: "Minimalist",
-            5: "3D Luxury"
+            5: "3D Luxury",
+            6: "Aurora Glow",
+            7: "Split Contrast",
+            8: "Sunrise Spotlight"
         }
         
         template_name = template_names.get(self.selected_template, "Custom")
@@ -1573,7 +1583,10 @@ class ModernQRGenerator(QMainWindow):
             2: "Glassmorphism", 
             3: "Neon Cyberpunk",
             4: "Minimalist",
-            5: "3D Luxury"
+            5: "3D Luxury",
+            6: "Aurora Glow",
+            7: "Split Contrast",
+            8: "Sunrise Spotlight"
         }
         
         # 检查是否是内置模板
@@ -1649,13 +1662,23 @@ class ModernQRGenerator(QMainWindow):
             os.close(temp_fd)
             
             try:
-                # 快速预览模式使用较小的比例
-                scale = min(self.qr_scale, 10) if self.quick_preview_mode else self.qr_scale
+                # 快速预览模式使用较小的比例，但仍保持与滑块成比例
+                if self.quick_preview_mode:
+                    scaled_value = int(max(5, round(self.qr_scale * self.preview_quality)))
+                    scale = max(5, scaled_value)
+                else:
+                    scale = self.qr_scale
                 
                 qr.save(temp_path, scale=scale,
-                       dark='#1a1a2e', light='#ffffff', border=1)
+                        dark='#1a1a2e', light='#ffffff', border=1)
                 
                 qr_img = Image.open(temp_path)
+                self.last_qr_preview_size = qr_img.size
+                if hasattr(self, 'qr_dimensions_label'):
+                    approx_cm = (qr_img.width / max(1, self.output_dpi)) * 2.54
+                    self.qr_dimensions_label.setText(
+                        f"QR Pixels: {qr_img.width} × {qr_img.height}  (~{approx_cm:.1f} cm)"
+                    )
                 
                 # 获取颜色
                 if self.use_custom_colors and all(self.custom_colors):
@@ -1744,6 +1767,12 @@ class ModernQRGenerator(QMainWindow):
             return self.template_minimalist
         elif self.selected_template == 5:
             return self.template_3d_card
+        elif self.selected_template == 6:
+            return self.template_aurora_glow
+        elif self.selected_template == 7:
+            return self.template_split_contrast
+        elif self.selected_template == 8:
+            return self.template_sunrise_spotlight
         
         # 自定义模板
         for template in self.custom_templates:
@@ -2060,6 +2089,151 @@ class ModernQRGenerator(QMainWindow):
         
         return final_img
     
+    def template_aurora_glow(self, qr_img, file_name, colors, logo_path, text_settings):
+        qr_width, qr_height = qr_img.size
+        card_width = qr_width + 260
+        card_height = qr_height + 360
+        
+        base = Image.new('RGB', (card_width, card_height), (8, 10, 28))
+        glow_layer = Image.new('RGBA', (card_width, card_height), (0, 0, 0, 0))
+        glow_draw = ImageDraw.Draw(glow_layer)
+        
+        for idx, color in enumerate((colors[2], colors[1], colors[0])):
+            alpha = max(30, 150 - idx * 40)
+            padding = idx * 40
+            glow_draw.ellipse(
+                [padding, 80 + padding, card_width - padding, card_height - 140 - padding],
+                fill=(*color, alpha)
+            )
+        glow_layer = glow_layer.filter(ImageFilter.GaussianBlur(radius=55))
+        base = Image.alpha_composite(base.convert('RGBA'), glow_layer).convert('RGB')
+        
+        qr_box_width = qr_width + 100
+        qr_box_height = qr_height + 100
+        qr_box_x = (card_width - qr_box_width) // 2
+        qr_box_y = 120
+        
+        card_overlay = Image.new('RGBA', (qr_box_width, qr_box_height), (18, 18, 40, 235))
+        highlight = Image.new('RGBA', (qr_box_width, qr_box_height), (255, 255, 255, 18))
+        highlight = highlight.filter(ImageFilter.GaussianBlur(6))
+        card_overlay = Image.alpha_composite(card_overlay, highlight)
+        shadow = Image.new('RGBA', (qr_box_width + 50, qr_box_height + 50), (0, 0, 0, 0))
+        shadow_draw = ImageDraw.Draw(shadow)
+        shadow_draw.rounded_rectangle(
+            [0, 0, qr_box_width + 50, qr_box_height + 50],
+            radius=45,
+            fill=(0, 0, 0, 120)
+        )
+        shadow = shadow.filter(ImageFilter.GaussianBlur(18))
+        base.paste(shadow, (qr_box_x - 25, qr_box_y - 25), shadow)
+        
+        base.paste(card_overlay, (qr_box_x, qr_box_y), card_overlay)
+        base.paste(qr_img, (qr_box_x + 50, qr_box_y + 50))
+        
+        if logo_path and os.path.exists(logo_path):
+            self.add_rounded_logo(base, logo_path,
+                                  (qr_box_x + qr_box_width//2 - 70, qr_box_y + qr_box_height//2 - 70), 140)
+        
+        draw = ImageDraw.Draw(base)
+        try:
+            title_font = ImageFont.truetype("arial.ttf", text_settings['title_font_size'])
+            subtitle_font = ImageFont.truetype("arial.ttf", text_settings['subtitle_font_size'])
+            name_font = ImageFont.truetype("arial.ttf", text_settings['name_font_size'])
+        except:
+            title_font = subtitle_font = name_font = ImageFont.load_default()
+        
+        text_color = self.hex_to_rgb(text_settings['text_color'])
+        draw.text((60, 40), text_settings['title'], font=title_font, fill=text_color)
+        draw.text((60, card_height - 140), text_settings['subtitle'], font=subtitle_font, fill=text_color)
+        draw.text((60, card_height - 90), file_name, font=name_font, fill=text_color)
+        
+        return base
+    
+    def template_split_contrast(self, qr_img, file_name, colors, logo_path, text_settings):
+        qr_width, qr_height = qr_img.size
+        accent_width = max(200, qr_width // 2)
+        card_width = qr_width + accent_width + 220
+        card_height = qr_height + 240
+        
+        base = Image.new('RGB', (card_width, card_height), tuple(min(255, c + 35) for c in colors[2]))
+        draw = ImageDraw.Draw(base)
+        draw.rectangle([0, 0, accent_width, card_height], fill=colors[0])
+        
+        qr_x = accent_width + (card_width - accent_width - qr_width) // 2
+        qr_y = 100
+        shadow = Image.new('RGBA', (qr_width + 60, qr_height + 60), (0, 0, 0, 0))
+        shadow_draw = ImageDraw.Draw(shadow)
+        shadow_draw.rounded_rectangle([0, 0, qr_width + 60, qr_height + 60], radius=30, fill=(0, 0, 0, 90))
+        shadow = shadow.filter(ImageFilter.GaussianBlur(10))
+        base.paste(shadow, (qr_x - 30, qr_y - 30), shadow)
+        base.paste(qr_img, (qr_x, qr_y))
+        
+        if logo_path and os.path.exists(logo_path):
+            self.add_rounded_logo(base, logo_path,
+                                  (qr_x + qr_width//2 - 60, qr_y + qr_height//2 - 60), 120)
+        
+        try:
+            title_font = ImageFont.truetype("arial.ttf", text_settings['title_font_size'])
+            subtitle_font = ImageFont.truetype("arial.ttf", text_settings['subtitle_font_size'])
+            name_font = ImageFont.truetype("arial.ttf", text_settings['name_font_size'])
+        except:
+            title_font = subtitle_font = name_font = ImageFont.load_default()
+        
+        text_color = self.hex_to_rgb(text_settings['text_color'])
+        draw.text((30, 70), text_settings['title'], font=title_font, fill=text_color)
+        draw.text((30, 130), text_settings['subtitle'], font=subtitle_font, fill=text_color)
+        draw.text((30, card_height - 90), file_name, font=name_font, fill=text_color)
+        
+        draw.line([(accent_width - 8, 60), (accent_width - 8, card_height - 60)], fill=colors[1], width=4)
+        draw.line([(30, card_height - 105), (accent_width - 30, card_height - 105)], fill=colors[1], width=3)
+        
+        return base
+    
+    def template_sunrise_spotlight(self, qr_img, file_name, colors, logo_path, text_settings):
+        qr_width, qr_height = qr_img.size
+        card_width = qr_width + 280
+        card_height = qr_height + 280
+        
+        base = Image.new('RGB', (card_width, card_height), colors[2])
+        diagonal = Image.new('RGBA', (card_width, card_height), (0, 0, 0, 0))
+        diag_draw = ImageDraw.Draw(diagonal)
+        diag_draw.polygon([(0, card_height), (card_width, 0), (card_width, card_height)], fill=(*colors[1], 180))
+        diagonal = diagonal.filter(ImageFilter.GaussianBlur(12))
+        base = Image.alpha_composite(base.convert('RGBA'), diagonal).convert('RGB')
+        
+        qr_box_width = qr_width + 60
+        qr_box_height = qr_height + 60
+        qr_x = 140
+        qr_y = 80
+        
+        panel = Image.new('RGBA', (qr_box_width, qr_box_height), (255, 255, 255, 255))
+        panel = panel.filter(ImageFilter.GaussianBlur(1))
+        base.paste(panel, (qr_x - 30, qr_y - 30), panel)
+        base.paste(qr_img, (qr_x, qr_y))
+        
+        if logo_path and os.path.exists(logo_path):
+            self.add_rounded_logo(base, logo_path,
+                                  (qr_x + qr_width//2 - 50, qr_y + qr_height//2 - 50), 100)
+        
+        draw = ImageDraw.Draw(base)
+        try:
+            title_font = ImageFont.truetype("arial.ttf", text_settings['title_font_size'])
+            subtitle_font = ImageFont.truetype("arial.ttf", text_settings['subtitle_font_size'])
+            name_font = ImageFont.truetype("arial.ttf", text_settings['name_font_size'])
+        except:
+            title_font = subtitle_font = name_font = ImageFont.load_default()
+        
+        text_color = self.hex_to_rgb(text_settings['text_color'])
+        draw.text((qr_x + qr_width + 60, 90), text_settings['title'], font=title_font, fill=text_color)
+        draw.text((qr_x + qr_width + 60, 160), text_settings['subtitle'], font=subtitle_font, fill=text_color)
+        
+        info_box_y = card_height - 140
+        draw.rectangle([(60, info_box_y), (card_width - 60, info_box_y + 80)],
+                       fill=(255, 255, 255), outline=colors[0], width=3)
+        draw.text((80, info_box_y + 20), file_name, font=name_font, fill=colors[0])
+        
+        return base
+    
     # 辅助函数
     def create_gradient(self, width, height, color1, color2, direction='vertical'):
         base = Image.new('RGB', (width, height))
@@ -2104,6 +2278,21 @@ class ModernQRGenerator(QMainWindow):
     def hex_to_rgb(self, hex_color):
         hex_color = hex_color.lstrip('#')
         return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+    
+    def normalize_palette(self, palette, allow_none=False):
+        if not palette:
+            return [None, None, None] if allow_none else [(26, 35, 126), (74, 0, 224), (138, 43, 226)]
+        
+        normalized = []
+        for color in palette:
+            if color is None:
+                normalized.append(None if allow_none else (26, 35, 126))
+                continue
+            if isinstance(color, (list, tuple)):
+                normalized.append(tuple(int(c) for c in color[:3]))
+            else:
+                normalized.append(color)
+        return normalized
     
     # 文件操作
     def browse_input_file(self):
@@ -2238,7 +2427,7 @@ class ModernQRGenerator(QMainWindow):
         dialog = TemplateDialog(self, "Add Custom Template")
         if dialog.exec() == QDialog.DialogCode.Accepted:
             template = dialog.get_template()
-            template_id = max([t['id'] for t in self.custom_templates], default=5) + 1
+            template_id = max([t['id'] for t in self.custom_templates], default=8) + 1
             template['id'] = template_id
             self.custom_templates.append(template)
             self.save_custom_templates()
@@ -2368,8 +2557,8 @@ class ModernQRGenerator(QMainWindow):
             self.generation_options.create_pdf = config.get("create_pdf", self.generation_options.create_pdf)
         
         self.selected_template = config.get("selected_template", self.selected_template)
-        self.theme_colors = config.get("theme_colors", self.theme_colors)
-        self.custom_colors = config.get("custom_colors", self.custom_colors)
+        self.theme_colors = self.normalize_palette(config.get("theme_colors", self.theme_colors))
+        self.custom_colors = self.normalize_palette(config.get("custom_colors", self.custom_colors), allow_none=True)
         self.use_custom_colors = config.get("use_custom_colors", self.use_custom_colors)
         self.dark_theme = config.get("dark_theme", self.dark_theme)
         self.auto_theme = config.get("auto_theme", self.auto_theme)
