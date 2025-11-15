@@ -2224,13 +2224,22 @@ class ModernQRGenerator(QMainWindow):
             title_font = subtitle_font = name_font = ImageFont.load_default()
         
         text_color = self.hex_to_rgb(text_settings['text_color'])
-        draw.text((qr_x + qr_width + 60, 90), text_settings['title'], font=title_font, fill=text_color)
-        draw.text((qr_x + qr_width + 60, 160), text_settings['subtitle'], font=subtitle_font, fill=text_color)
+        max_width = card_width - 120
+        title_bbox = draw.textbbox((0, 0), text_settings['title'], font=title_font)
+        title_x = max(60, (card_width - (title_bbox[2] - title_bbox[0])) // 2)
+        draw.text((title_x, 35), text_settings['title'], font=title_font, fill=text_color)
+        
+        subtitle_bbox = draw.textbbox((0, 0), text_settings['subtitle'], font=subtitle_font)
+        subtitle_x = max(60, (card_width - (subtitle_bbox[2] - subtitle_bbox[0])) // 2)
+        draw.text((subtitle_x, 35 + (title_bbox[3] - title_bbox[1]) + 10), text_settings['subtitle'],
+                  font=subtitle_font, fill=text_color)
         
         info_box_y = card_height - 140
         draw.rectangle([(60, info_box_y), (card_width - 60, info_box_y + 80)],
                        fill=(255, 255, 255), outline=colors[0], width=3)
-        draw.text((80, info_box_y + 20), file_name, font=name_font, fill=colors[0])
+        name_bbox = draw.textbbox((0, 0), file_name, font=name_font)
+        name_x = max(80, (card_width - (name_bbox[2] - name_bbox[0])) // 2)
+        draw.text((name_x, info_box_y + 20), file_name, font=name_font, fill=colors[0])
         
         return base
     

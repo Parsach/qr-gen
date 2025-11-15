@@ -9,19 +9,19 @@
         "subtitle": "Scan to Connect",
         "name_prefix": "VPN",
         "title_font_size": 24,
-        "subtitle_font_size": 18,
+        "subtitle_font_size": 19,
         "name_font_size": 40,
         "text_color": "#FFFFFF"
     },
     "generation": {
-        "qr_scale": 16,
+        "qr_scale": 10,
         "output_dpi": 600,
         "output_quality": 98,
         "output_format": "PNG",
         "create_zip": false,
         "create_pdf": false
     },
-    "selected_template": 5,
+    "selected_template": 8,
     "theme_colors": [
         [
             0,
