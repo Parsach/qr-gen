@@ -21,22 +21,22 @@
         "create_zip": false,
         "create_pdf": false
     },
-    "selected_template": 8,
+    "selected_template": 6,
     "theme_colors": [
         [
-            0,
-            119,
-            190
+            34,
+            139,
+            34
         ],
         [
-            0,
-            180,
-            216
+            107,
+            142,
+            35
         ],
         [
-            144,
-            224,
-            239
+            124,
+            252,
+            0
         ]
     ],
     "custom_colors": [
@@ -56,10 +56,10 @@
             239
         ]
     ],
-    "use_custom_colors": true,
+    "use_custom_colors": false,
     "dark_theme": true,
     "auto_theme": false,
     "quick_preview_mode": true,
     "preview_quality": 0.7,
-    "current_theme_preset": "Blue Ocean"
+    "current_theme_preset": "Custom"
 }

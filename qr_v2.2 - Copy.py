@@ -84,6 +84,7 @@ class ModernQRGenerator(QMainWindow):
         self.selected_template = 1
         self.theme_colors = [(26, 35, 126), (74, 0, 224), (138, 43, 226)]
         self.custom_colors = [None, None, None]
+        self.color_buttons = []
         self.use_custom_colors = False
         
         # 输出格式
@@ -320,6 +321,10 @@ class ModernQRGenerator(QMainWindow):
         
         self.theme_preset_combo = QComboBox()
         self.theme_preset_combo.addItems(list(self.theme_presets.keys()) + ["Custom"])
+        if self.current_theme_preset in self.theme_presets:
+            self.theme_preset_combo.setCurrentText(self.current_theme_preset)
+        else:
+            self.theme_preset_combo.setCurrentText("Custom")
         self.theme_preset_combo.currentTextChanged.connect(self.on_theme_preset_changed)
         theme_preset_layout.addWidget(self.theme_preset_combo)
         
@@ -491,6 +496,8 @@ class ModernQRGenerator(QMainWindow):
             self.color_buttons_layout.addWidget(btn)
         
         color_layout.addLayout(self.color_buttons_layout)
+        self.custom_colors_check.setChecked(self.use_custom_colors)
+        self.toggle_custom_colors(self.use_custom_colors)
         scroll_layout.addWidget(color_group)
         
         # 生成按钮
@@ -1208,10 +1215,17 @@ class ModernQRGenerator(QMainWindow):
     
     def on_theme_preset_changed(self, preset_name):
         if preset_name in self.theme_presets:
-            self.theme_colors = self.theme_presets[preset_name]
+            self.theme_colors = [tuple(color) for color in self.theme_presets[preset_name]]
             self.current_theme_preset = preset_name
+            if hasattr(self, 'custom_colors_check') and self.use_custom_colors:
+                self.use_custom_colors = False
+                self.custom_colors_check.blockSignals(True)
+                self.custom_colors_check.setChecked(False)
+                self.custom_colors_check.blockSignals(False)
             self.update_color_buttons()
             self.update_preview()
+        else:
+            self.current_theme_preset = "Custom"
     
     def update_color_buttons(self):
         for i, btn in enumerate(self.color_buttons):
@@ -1409,6 +1423,11 @@ class ModernQRGenerator(QMainWindow):
         self.create_zip_check.setChecked(self.create_zip)
         self.create_pdf_check.setChecked(self.create_pdf)
         self.transparent_bg_check.setChecked(preset.get("transparent_bg", False))
+        if hasattr(self, 'custom_colors_check'):
+            self.custom_colors_check.blockSignals(True)
+            self.custom_colors_check.setChecked(self.use_custom_colors)
+            self.custom_colors_check.blockSignals(False)
+            self.toggle_custom_colors(self.use_custom_colors)
         
         self.update_color_buttons()
         self.update_preview()
@@ -1613,21 +1632,34 @@ class ModernQRGenerator(QMainWindow):
             btn.setEnabled(checked)
         
         if checked:
+            self.current_theme_preset = "Custom"
+            if hasattr(self, 'theme_preset_combo'):
+                self.theme_preset_combo.blockSignals(True)
+                self.theme_preset_combo.setCurrentText("Custom")
+                self.theme_preset_combo.blockSignals(False)
             for i in range(3):
                 if self.custom_colors[i] is None:
                     self.custom_colors[i] = self.theme_colors[i]
                 color = self.custom_colors[i]
                 self.color_buttons[i].setStyleSheet(f"background-color: rgb{color}; border: 2px solid #555; border-radius: 6px; color: white;")
+        self.update_color_buttons()
         
-        self.update_preview()
-    
+        if hasattr(self, 'preview_label'):
+            self.update_preview()
+
     def choose_color(self, index):
         color = QColorDialog.getColor()
         if color.isValid():
             rgb = (color.red(), color.green(), color.blue())
             self.custom_colors[index] = rgb
-            self.color_buttons[index].setStyleSheet(f"background-color: rgb{rgb}; border: 2px solid #555; border-radius: 6px; color: white;")
-            self.update_preview()
+            self.current_theme_preset = "Custom"
+            if hasattr(self, 'theme_preset_combo'):
+                self.theme_preset_combo.blockSignals(True)
+                self.theme_preset_combo.setCurrentText("Custom")
+                self.theme_preset_combo.blockSignals(False)
+            self.update_color_buttons()
+            if hasattr(self, 'preview_label'):
+                self.update_preview()
     
     def choose_text_color(self):
         color = QColorDialog.getColor(QColor(self.text_color))
@@ -2191,31 +2223,20 @@ class ModernQRGenerator(QMainWindow):
     
     def template_sunrise_spotlight(self, qr_img, file_name, colors, logo_path, text_settings):
         qr_width, qr_height = qr_img.size
-        card_width = qr_width + 280
-        card_height = qr_height + 280
+        card_width = qr_width + 160
+        card_height = qr_height + 220
         
-        base = Image.new('RGB', (card_width, card_height), colors[2])
-        diagonal = Image.new('RGBA', (card_width, card_height), (0, 0, 0, 0))
-        diag_draw = ImageDraw.Draw(diagonal)
-        diag_draw.polygon([(0, card_height), (card_width, 0), (card_width, card_height)], fill=(*colors[1], 180))
-        diagonal = diagonal.filter(ImageFilter.GaussianBlur(12))
-        base = Image.alpha_composite(base.convert('RGBA'), diagonal).convert('RGB')
+        base = self.create_gradient(card_width, card_height, colors[0], colors[1], 'vertical')
+        draw = ImageDraw.Draw(base)
         
-        qr_box_width = qr_width + 60
-        qr_box_height = qr_height + 60
-        qr_x = 140
-        qr_y = 80
-        
-        panel = Image.new('RGBA', (qr_box_width, qr_box_height), (255, 255, 255, 255))
-        panel = panel.filter(ImageFilter.GaussianBlur(1))
-        base.paste(panel, (qr_x - 30, qr_y - 30), panel)
+        qr_x = (card_width - qr_width) // 2
+        qr_y = 90
         base.paste(qr_img, (qr_x, qr_y))
         
         if logo_path and os.path.exists(logo_path):
             self.add_rounded_logo(base, logo_path,
-                                  (qr_x + qr_width//2 - 50, qr_y + qr_height//2 - 50), 100)
+                                  (qr_x + qr_width//2 - 60, qr_y + qr_height//2 - 60), 120)
         
-        draw = ImageDraw.Draw(base)
         try:
             title_font = ImageFont.truetype("arial.ttf", text_settings['title_font_size'])
             subtitle_font = ImageFont.truetype("arial.ttf", text_settings['subtitle_font_size'])
@@ -2224,22 +2245,21 @@ class ModernQRGenerator(QMainWindow):
             title_font = subtitle_font = name_font = ImageFont.load_default()
         
         text_color = self.hex_to_rgb(text_settings['text_color'])
-        max_width = card_width - 120
         title_bbox = draw.textbbox((0, 0), text_settings['title'], font=title_font)
-        title_x = max(60, (card_width - (title_bbox[2] - title_bbox[0])) // 2)
-        draw.text((title_x, 35), text_settings['title'], font=title_font, fill=text_color)
+        title_width = title_bbox[2] - title_bbox[0]
+        title_x = max(20, (card_width - title_width) // 2)
+        draw.text((title_x, 20), text_settings['title'], font=title_font, fill=text_color)
         
         subtitle_bbox = draw.textbbox((0, 0), text_settings['subtitle'], font=subtitle_font)
-        subtitle_x = max(60, (card_width - (subtitle_bbox[2] - subtitle_bbox[0])) // 2)
-        draw.text((subtitle_x, 35 + (title_bbox[3] - title_bbox[1]) + 10), text_settings['subtitle'],
-                  font=subtitle_font, fill=text_color)
+        subtitle_width = subtitle_bbox[2] - subtitle_bbox[0]
+        subtitle_x = max(20, (card_width - subtitle_width) // 2)
+        draw.text((subtitle_x, 20 + (title_bbox[3] - title_bbox[1]) + 5),
+                  text_settings['subtitle'], font=subtitle_font, fill=text_color)
         
-        info_box_y = card_height - 140
-        draw.rectangle([(60, info_box_y), (card_width - 60, info_box_y + 80)],
-                       fill=(255, 255, 255), outline=colors[0], width=3)
         name_bbox = draw.textbbox((0, 0), file_name, font=name_font)
-        name_x = max(80, (card_width - (name_bbox[2] - name_bbox[0])) // 2)
-        draw.text((name_x, info_box_y + 20), file_name, font=name_font, fill=colors[0])
+        name_width = name_bbox[2] - name_bbox[0]
+        name_x = max(20, (card_width - name_width) // 2)
+        draw.text((name_x, qr_y + qr_height + 30), file_name, font=name_font, fill=text_color)
         
         return base
     
